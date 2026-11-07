@@ -1,0 +1,31 @@
+# Escenario ibérico (ES+PT) para Railway — primera pasada de dimensionamiento.
+# Se superpone a config/config.default.yaml.
+run:
+  name: iberia-2030
+  disable_progressbar: true
+  shared_resources:
+    policy: false
+
+countries: [ES, PT]
+
+# Año meteorológico completo 2013 (cutout europe-2013-sarah3-era5, por defecto)
+snapshots:
+  start: "2013-01-01"
+  end: "2014-01-01"
+  inclusive: left
+
+planning_horizons: [2030]
+
+sector:
+  enabled: false   # solo sector eléctrico
+
+clustering:
+  temporal:
+    averaging: 3h   # 2.920 pasos: equilibrio entre precisión y memoria (8 GB)
+  cluster_network:
+    n_clusters: 10
+
+solving:
+  solver:
+    name: highs
+    options: highs-default

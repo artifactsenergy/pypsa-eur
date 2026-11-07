@@ -17,6 +17,7 @@ COPY . .
 # Comando por defecto: tutorial (Bélgica, 1 semana, HiGHS). Se sobreescribe con la variable SNAKE_TARGET/SNAKE_CONFIG
 ENV SNAKE_TARGET=results/test-elec/networks/solved_2050.nc \
     SNAKE_CONFIG=config/test/config.electricity.yaml \
-    SNAKE_CORES=all
+    SNAKE_CORES=all \
+    SNAKE_EXTRA=""
 
-CMD ["bash", "-lc", "pixi run -e default snakemake --cores $SNAKE_CORES $SNAKE_TARGET --configfile $SNAKE_CONFIG --rerun-incomplete"]
+CMD ["bash", "-lc", "pixi run -e default snakemake --cores $SNAKE_CORES $SNAKE_TARGET --configfile $SNAKE_CONFIG --rerun-incomplete $SNAKE_EXTRA"]
