@@ -1,6 +1,9 @@
-# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
-#
-# SPDX-License-Identifier: CC0-1.0
-
-*
-!pixi.*
+# Railway build: incluir el código del workflow, excluir artefactos y entornos locales
+.git
+.pixi
+.snakemake
+results
+resources
+logs
+benchmarks
+doc
