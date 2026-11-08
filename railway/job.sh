@@ -31,8 +31,16 @@ latido(){
   done
 }
 falla(){ echo "== FALLO: $1"; cat $E/avisos.txt 2>/dev/null; tail -n 120 $LOG 2>/dev/null; estado error "$1" "$(tail -c 1500 $LOG 2>/dev/null)"; B resumen $E >/dev/null 2>&1; B subir $E || true; exit 1; }
-# Entorno pixi activado con el script generado en la imagen (no `pixi run`, que reinstala highspy 1.13 del lock).
-if [[ -f /opt/pixi_activar.sh ]]; then PX(){ ( source /opt/pixi_activar.sh && "$@" ); }; else PX(){ pixi run -e default "$@"; }; fi
+# Entorno pixi: se activa sin `pixi run`, que resincroniza con pixi.lock y deshace highspy 1.15 (HiPO).
+ENVP=/app/.pixi/envs/default
+if [[ -f /opt/pixi_activar.sh ]]; then PX(){ ( source /opt/pixi_activar.sh && "$@" ); }
+else PX(){ ( export PATH=$ENVP/bin:$PATH CONDA_PREFIX=$ENVP; "$@" ); }; fi
+# Garantía de HiPO: si el entorno no tiene highspy >= 1.15, se instala aquí (unos segundos).
+HV=$(PX python -c 'from importlib.metadata import version as v;print(v("highspy"))' 2>/dev/null || echo 0)
+if [[ "$(printf '%s\n1.15\n' "$HV" | sort -V | head -n1)" != "1.15" ]]; then
+  echo "== highspy $HV en el entorno ($(PX which python)); instalando 1.15.1 + extras"
+  PX python -m pip install -q --no-cache-dir "highspy>=1.15.1" "highspy-extras>=1.15.1" 2>&1 | grep -v "dependency\|tsam" | tail -n 3
+fi
 
 # Clave de Copernicus CDS (solo para CUTOUT_FUENTE=construir): CDSAPI_URL y CDSAPI_KEY -> ~/.cdsapirc
 if [[ -n "${CDSAPI_KEY:-}" ]]; then
@@ -56,7 +64,7 @@ ANIOS=$(python3 -c "import json;print(' '.join(map(str,json.load(open('$E/paquet
 RUN=$(python3 -c "import json;print('edge-'+json.load(open('$E/paquete.json')).get('ejecucion','manual'))")
 echo "== $RUN_ID | años: $ANIOS | nudos ${CLUSTERS:-37} | ${RESOLUCION:-3h} | cutout ${CUTOUT_FUENTE:-archivo} | $(nproc) vCPU, $(awk '/MemTotal/{printf "%.1f", $2/1048576}' /proc/meminfo) GB" | tee -a $LOG
 latido & LATIDO_PID=$!; trap 'kill $LATIDO_PID 2>/dev/null' EXIT
-echo "== solver: highs ${SOLVER_OPCIONES:-highs-hipo} ($(PX python -c 'from importlib.metadata import version as v;print("highspy",v("highspy"))' 2>/dev/null || echo 'highspy ?'))"
+echo "== solver: highs ${SOLVER_OPCIONES:-highs-hipo} ($(PX python -c 'from importlib.metadata import version as v;print("highspy",v("highspy"),"extras",v("highspy-extras"))' 2>/dev/null || echo 'highspy ?'))"
 HECHOS=()
 for Y in $ANIOS; do
   CFG=$E/config_$Y.yaml; SOL=results/$RUN/networks/solved_$Y.nc
