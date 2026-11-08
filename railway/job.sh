@@ -25,9 +25,17 @@ PX(){ pixi run -e default "$@"; }
 if [[ -n "${CDSAPI_KEY:-}" ]]; then
   printf 'url: %s\nkey: %s\n' "${CDSAPI_URL:-https://cds.climate.copernicus.eu/api}" "$CDSAPI_KEY" > ~/.cdsapirc
 fi
-# Cutouts y datos descargados en el volumen (/app/results) para no bajarlos en cada ejecución.
-mkdir -p /app/results/_cache/cutout data
-[[ -e data/cutout ]] || ln -s /app/results/_cache/cutout data/cutout
+# Cutouts: por defecto en el disco temporal del contenedor (se descargan en cada ejecución; el volumen de
+# resultados es pequeño). CUTOUT_EN_VOLUMEN=1 los guarda en el volumen (/app/results/_cache/cutout), lo que
+# hace falta para no reconstruir en cada ejecución los años que no están en el archivo de PyPSA.
+mkdir -p data
+if [[ "${CUTOUT_EN_VOLUMEN:-0}" == "1" ]]; then
+  mkdir -p /app/results/_cache/cutout
+  [[ -e data/cutout ]] || ln -s /app/results/_cache/cutout data/cutout
+else
+  rm -rf /app/results/_cache/cutout          # restos de intentos anteriores: liberan el volumen
+fi
+echo "disco: $(df -h /app | tail -1 | awk '{print $4}') libres en /app; volumen: $(df -h /app/results | tail -1 | awk '{print $4}') libres"
 
 estado calculando "preparando paquete"
 B paquete $E/paquete.json >>$LOG 2>&1 || falla "paquete"

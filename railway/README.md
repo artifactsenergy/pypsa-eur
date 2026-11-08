@@ -15,7 +15,7 @@ Por cada año del paquete:
 4. snakemake resuelve; `edge_export.py` publica `precio_horario_<año>.csv` (hora de Madrid), `flujos_es_<año>.csv`,
    `mix_<año>.csv` y la **comprobación de supuestos** (modelo frente a paquete).
 
-Resultados en el bucket, `runs/pypsa/<id>/`. Los cutouts se guardan en el volumen (`/app/results/_cache/cutout`).
+Resultados en el bucket, `runs/pypsa/<id>/`. Los cutouts van al disco temporal del contenedor y se descargan en cada ejecución; con `CUTOUT_EN_VOLUMEN=1` se guardan en el volumen (hace falta ampliarlo: un cutout de Europa de un año no cabe en 5 GB).
 
 ## Puesta en marcha
 
