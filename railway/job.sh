@@ -31,7 +31,8 @@ latido(){
   done
 }
 falla(){ echo "== FALLO: $1"; cat $E/avisos.txt 2>/dev/null; tail -n 120 $LOG 2>/dev/null; estado error "$1" "$(tail -c 1500 $LOG 2>/dev/null)"; B resumen $E >/dev/null 2>&1; B subir $E || true; exit 1; }
-PX(){ pixi run -e default "$@"; }
+# Entorno pixi activado con el script generado en la imagen (no `pixi run`, que reinstala highspy 1.13 del lock).
+if [[ -f /opt/pixi_activar.sh ]]; then PX(){ ( source /opt/pixi_activar.sh && "$@" ); }; else PX(){ pixi run -e default "$@"; }; fi
 
 # Clave de Copernicus CDS (solo para CUTOUT_FUENTE=construir): CDSAPI_URL y CDSAPI_KEY -> ~/.cdsapirc
 if [[ -n "${CDSAPI_KEY:-}" ]]; then
