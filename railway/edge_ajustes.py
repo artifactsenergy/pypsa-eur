@@ -76,8 +76,17 @@ def ajustar(n, obj, anio):
                 inf["cambios"][tec] = {"existente_mw": round(existente), "objetivo_mw": round(T), "modo": "escalado"}
             elif len(ampl):
                 n.generators.loc[ampl.index, "p_nom_min"] = 0.0     # el CCL manda sobre los mínimos estimados
-                ccl.append((c, CCL_NOMBRE.get(tec, tec), T))
-                inf["cambios"][tec] = {"existente_mw": round(existente), "objetivo_mw": round(T), "modo": "CCL"}
+                potencial = existente + float(ampl.p_nom_max.replace(np.inf, 1e12).sum())
+                T_ccl = T
+                if T > potencial:   # más objetivo que potencial con esta resolución: se recorta (si no, es infactible)
+                    T_ccl = potencial * 0.999
+                    inf["avisos"].append("%s: objetivo %d MW > potencial del modelo %d MW con estos nudos; se fija %d MW"
+                                         % (tec, T, potencial, T_ccl))
+                ccl.append((c, CCL_NOMBRE.get(tec, tec), T_ccl))
+                inf["cambios"][tec] = {"existente_mw": round(existente), "objetivo_mw": round(T), "modo": "CCL",
+                                       "potencial_mw": round(min(potencial, 1e9)), "fijado_mw": round(T_ccl)}
+                print("CCL %s %-10s objetivo %8.0f | existente %8.0f | potencial %10.0f" % (c, tec, T, existente,
+                                                                                              min(potencial, 1e9)))
             else:
                 inf["avisos"].append("%s: objetivo %d MW > existente %d MW y no es ampliable en esta configuración; "
                                      "queda el existente" % (tec, T, existente))
