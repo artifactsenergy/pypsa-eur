@@ -2,7 +2,7 @@
 FROM ghcr.io/prefix-dev/pixi:0.81.0
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates bash git && \
+    apt-get install -y --no-install-recommends ca-certificates bash git python3 python3-boto3 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -20,4 +20,6 @@ ENV SNAKE_TARGET=results/test-elec/networks/solved_2050.nc \
     SNAKE_CORES=all \
     SNAKE_EXTRA=""
 
-CMD ["bash", "-lc", "pixi run -e default snakemake --cores $SNAKE_CORES $SNAKE_TARGET --configfile $SNAKE_CONFIG --rerun-incomplete $SNAKE_EXTRA"]
+# v0.62 de EDGE: railway/job.sh. Con PAQUETE_KEY (lanzado desde EDGE) usa los supuestos comunes del escenario;
+# sin él ejecuta el snakemake de SNAKE_* como antes. El servicio de Railway NO debe tener Custom Start Command.
+CMD ["bash", "railway/job.sh"]
