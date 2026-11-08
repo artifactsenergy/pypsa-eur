@@ -6,11 +6,11 @@ Uso: python railway/edge_paquete.py config <paquete.json> <año> <salida.yaml>
 Qué fija el paquete en PyPSA-Eur:
   - años meteorológico y de planificación: snapshots del año meteorológico común; un horizonte por ejecución
     (la previsión 'overnight' de PyPSA-Eur solo admite uno);
-  - países: España, Portugal, Francia y sus vecinos, más los del plan [europa] (variable PAISES para cambiarlo);
+  - países: PAISES (opción del panel de EDGE) o, por defecto, España, Portugal, Francia y su entorno;
   - gas y CO2: los congelados por EDGE (costs.overwrites.fuel.gas y emission_prices.co2);
   - potencias y demanda de España y del plan europeo: NO van en la configuración; las aplica
     railway/edge_ajustes.py sobre la red compuesta antes de resolver (ver allí).
-Opciones del trabajo (variables de entorno que fija EDGE): CLUSTERS, RESOLUCION, CUTOUT_FUENTE.
+Opciones del trabajo (variables de entorno que fija EDGE): CLUSTERS, RESOLUCION, CUTOUT_FUENTE, PAISES.
 """
 import json
 import os
@@ -39,8 +39,12 @@ def cutout(anio_meteo, fuente):
 def configuracion(p, anio):
     a = p["por_anio"][str(anio)]
     met = int(p["anio_meteorologico"])
-    paises = os.environ.get("PAISES", "").split(",") if os.environ.get("PAISES") else \
-        sorted(set(PAISES_BASE) | set(p.get("europa_paises", [])))
+    # Países del modelo: PAISES (lo fija EDGE desde el panel) o España, Portugal, Francia y su entorno. Los países
+    # del plan [europa] que queden fuera se ignoran (con aviso): un conjunto con toda Europa no fuerza un modelo
+    # de toda Europa, que no cabe en la memoria del servicio.
+    paises = os.environ.get("PAISES", "").split(",") if os.environ.get("PAISES") else list(PAISES_BASE)
+    if "ES" not in paises:
+        paises = ["ES"] + paises
     fuente = os.environ.get("CUTOUT_FUENTE", "archivo")
     nombre, entrada = cutout(met, "construir" if fuente == "construir" else "archivo")
     cfg = {

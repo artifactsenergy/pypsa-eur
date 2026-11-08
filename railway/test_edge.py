@@ -24,7 +24,7 @@ def paquete():
                                                              "battery": 100, "hydro": 120, "PHS": 0, "solar_term": 10,
                                                              "cogeneracion": 0, "electrolizadores": 0},
                                              "almacenamiento": {"baterias_horas": 2.0}, "demanda_twh": 0.04},
-                                  "europa": {"FR": {"nuclear": 200, "demanda_twh": 0.03}}}}}
+                                  "europa": {"FR": {"nuclear": 200, "demanda_twh": 0.03}, "PL": {"solar": 5}}}}}
 
 
 def red():
@@ -63,6 +63,9 @@ def test_config():
     assert c["snapshots"]["start"] == "2025-01-01" and c["planning_horizons"] == [2030]
     assert c["costs"]["overwrites"]["fuel"]["gas"] == 30.0 and c["costs"]["emission_prices"]["co2"] == 80.0
     assert "FR" in c["countries"] and c["clustering"]["cluster_network"]["n_clusters"] == 20
+    os.environ["PAISES"] = "PT,FR"
+    assert edge_paquete.configuracion(paquete(), 2030)["countries"] == ["ES", "PT", "FR"]
+    os.environ.pop("PAISES")
     assert c["atlite"]["default_cutout"] == "europe-2025-sarah3-era5"
     os.environ["CUTOUT_FUENTE"] = "construir"
     c = edge_paquete.configuracion(paquete(), 2030)

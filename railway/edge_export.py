@@ -84,7 +84,10 @@ def comprobar(n, mx, p, anio):
     from edge_ajustes import GRUPOS, objetivos     # mismo directorio
     w = n.snapshot_weightings.generators
     filas = []
+    en_red = set(n.buses.country)
     for c, t in objetivos(p, anio).items():
+        if c not in en_red:            # país del plan fuera del modelo: no se comprueba
+            continue
         m = mx[mx.pais == c]
         for tec, cars in list(GRUPOS.items()) + [("hydro", ["hydro", "ror"]), ("PHS", ["PHS"]), ("battery", ["battery"])]:
             if tec in t:
