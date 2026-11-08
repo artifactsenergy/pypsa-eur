@@ -55,7 +55,8 @@ def configuracion(p, anio):
         "planning_horizons": [int(anio)],
         "foresight": "overnight",
         "sector": {"enabled": False},
-        "atlite": {"default_cutout": nombre},
+        # atlite calcula los perfiles renovables con 1 proceso por defecto; con 4 va varias veces más rápido (más RAM).
+        "atlite": {"default_cutout": nombre, "nprocesses": int(os.environ.get("ATLITE_PROCESOS", "4"))},
         "clustering": {"temporal": {"averaging": os.environ.get("RESOLUCION", "3h")},
                        "cluster_network": {"n_clusters": int(os.environ.get("CLUSTERS", "37"))}},
         "costs": {"overwrites": {"fuel": {"gas": float(a["gas_eur_mwh"])}},
