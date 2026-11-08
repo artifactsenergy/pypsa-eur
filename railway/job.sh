@@ -21,6 +21,10 @@ estado(){ B estado "$@" || true; }
 falla(){ estado error "$1" "$(tail -c 1500 $LOG 2>/dev/null)"; B resumen $E >/dev/null 2>&1; B subir $E || true; exit 1; }
 PX(){ pixi run -e default "$@"; }
 
+# Clave de Copernicus CDS (solo para CUTOUT_FUENTE=construir): CDSAPI_URL y CDSAPI_KEY -> ~/.cdsapirc
+if [[ -n "${CDSAPI_KEY:-}" ]]; then
+  printf 'url: %s\nkey: %s\n' "${CDSAPI_URL:-https://cds.climate.copernicus.eu/api}" "$CDSAPI_KEY" > ~/.cdsapirc
+fi
 # Cutouts y datos descargados en el volumen (/app/results) para no bajarlos en cada ejecución.
 mkdir -p /app/results/_cache/cutout data
 [[ -e data/cutout ]] || ln -s /app/results/_cache/cutout data/cutout
