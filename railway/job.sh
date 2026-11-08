@@ -91,6 +91,8 @@ for Y in $ANIOS; do
       echo "$Y: falló la optimización (ver logs/run.log)" | tee -a $E/avisos.txt; grep -iE "error|exception|infeasible" $LOG | tail -n 20; continue
     fi
   fi
+  # La red resuelta se guarda también en el bucket (red/solved_<año>.nc), para poder reexportar sin resolver otra vez.
+  mkdir -p $E/red && cp $SOL $E/red/ 2>/dev/null || true
   PX python railway/edge_export.py $SOL $E/paquete.json $Y $E $E/ajustes_$Y.json >>$LOG 2>&1 \
     && HECHOS+=($Y) || echo "$Y: exportación" >> $E/avisos.txt
 done

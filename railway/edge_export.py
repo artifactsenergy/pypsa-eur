@@ -57,24 +57,30 @@ def flujos_espana(n):
     return pd.DataFrame(out, index=n.snapshots)
 
 
+def mw(x):
+    """Potencia en MW redondeada; los generadores de corte de carga tienen p_nom infinito y cuentan como 0."""
+    v = pd.to_numeric(x, errors="coerce")
+    return int(round(float(v[np.isfinite(v)].sum())))
+
+
 def mix(n):
     w = n.snapshot_weightings.generators
     filas = []
     g = n.generators.assign(pais=n.generators.bus.map(n.buses.country))
     e = n.generators_t.p.mul(w, axis=0).sum()
     for (c, car), x in g.groupby(["pais", "carrier"]):
-        filas.append({"pais": c, "tecnologia": car, "potencia_mw": round(float(x.p_nom_opt.sum())),
+        filas.append({"pais": c, "tecnologia": car, "potencia_mw": mw(x.p_nom_opt),
                       "energia_twh": round(float(e.reindex(x.index).fillna(0).sum()) / 1e6, 2)})
     s = n.storage_units.assign(pais=n.storage_units.bus.map(n.buses.country))
     es = n.storage_units_t.p.clip(lower=0).mul(w, axis=0).sum() if len(s) else pd.Series(dtype=float)
     for (c, car), x in s.groupby(["pais", "carrier"]):
-        filas.append({"pais": c, "tecnologia": car, "potencia_mw": round(float(x.p_nom_opt.sum())),
+        filas.append({"pais": c, "tecnologia": car, "potencia_mw": mw(x.p_nom_opt),
                       "energia_twh": round(float(es.reindex(x.index).fillna(0).sum()) / 1e6, 2)})
     d = n.links[n.links.carrier == "battery discharger"]
     if len(d):
         ed = n.links_t.p1[d.index].mul(-1).clip(lower=0).mul(w, axis=0).sum() if len(n.links_t.p1.columns) else 0
         for c, x in d.assign(pais=d.bus1.map(n.buses.country)).groupby("pais"):
-            filas.append({"pais": c, "tecnologia": "battery", "potencia_mw": round(float(x.p_nom_opt.sum())),
+            filas.append({"pais": c, "tecnologia": "battery", "potencia_mw": mw(x.p_nom_opt),
                           "energia_twh": round(float(ed.reindex(x.index).fillna(0).sum()) / 1e6, 2)})
     return pd.DataFrame(filas).sort_values(["pais", "energia_twh"], ascending=[True, False])
 
@@ -120,6 +126,10 @@ def main():
     ind = {"precio_medio_" + c: round(float(pr[c].mean()), 2) for c in ("ES", "FR", "PT") if c in pr}
     ind["importacion_neta_es_twh"] = round(float(fl.sum(axis=1).mul(w).sum()) / 1e6, 2) if len(fl.columns) else 0.0
     ind["coste_total_meur"] = round(float(n.objective) / 1e6, 1) if n.objective is not None else None
+    # Energía no suministrada (generadores de corte de carga, carrier "load" en PyPSA-Eur)
+    ens = mx[mx.tecnologia.astype(str).str.contains("load", case=False)]
+    ind["energia_no_suministrada_twh"] = round(float(ens.energia_twh.sum()), 3)
+    ind["energia_no_suministrada_es_twh"] = round(float(ens[ens.pais == "ES"].energia_twh.sum()), 3)
     ind["supuestos_ok"] = all(f["ok"] for f in comp)
     ind["supuestos_desviados"] = sum(1 for f in comp if not f["ok"])
     out = {"indicadores": ind, "comprobacion_supuestos": comp,
