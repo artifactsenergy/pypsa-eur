@@ -17,7 +17,19 @@ fi
 export EDGE_DIR=/app/edge
 E=$EDGE_DIR; mkdir -p $E/logs; LOG=$E/logs/run.log
 B(){ python3 railway/edge_bucket.py "$@"; }
-estado(){ B estado "$@" || true; }
+estado(){ echo "[$(date -u +%H:%M:%S)] estado: $1 · $2${3:+ · $3}"; B estado "$@" || true; }
+# Latido: cada LATIDO_S segundos (300 por defecto) escribe en el log de Railway la memoria, el progreso de
+# snakemake y la última línea del log del solver, para ver si avanza sin esperar al final.
+T0=$(date +%s)
+latido(){
+  while sleep ${LATIDO_S:-300}; do
+    MEM=$(awk '{printf "%.1f", $1/1073741824}' /sys/fs/cgroup/memory.current 2>/dev/null || echo "?")
+    PASO=$(grep -E "steps \([0-9]+%\) done" $LOG 2>/dev/null | tail -n1 | sed 's/^ *//')
+    SLOG=$(find . -path "*solve_network*" -name "*.log" -newer $E/paquete.json 2>/dev/null | xargs -r ls -t 2>/dev/null | head -n1)
+    SOLV=""; [[ -n "$SLOG" ]] && SOLV=$(grep -v "^\s*$" "$SLOG" | tail -n1 | cut -c1-160)
+    echo "[$(date -u +%H:%M:%S)] latido +$(( ($(date +%s)-T0)/60 )) min | mem ${MEM} GB | ${PASO:-snakemake: sin progreso aún}${SOLV:+ | solver: $SOLV}"
+  done
+}
 falla(){ echo "== FALLO: $1"; cat $E/avisos.txt 2>/dev/null; tail -n 120 $LOG 2>/dev/null; estado error "$1" "$(tail -c 1500 $LOG 2>/dev/null)"; B resumen $E >/dev/null 2>&1; B subir $E || true; exit 1; }
 PX(){ pixi run -e default "$@"; }
 
@@ -42,6 +54,8 @@ B paquete $E/paquete.json >>$LOG 2>&1 || falla "paquete"
 ANIOS=$(python3 -c "import json;print(' '.join(map(str,json.load(open('$E/paquete.json'))['anios'])))")
 RUN=$(python3 -c "import json;print('edge-'+json.load(open('$E/paquete.json')).get('ejecucion','manual'))")
 echo "== $RUN_ID | años: $ANIOS | nudos ${CLUSTERS:-37} | ${RESOLUCION:-3h} | cutout ${CUTOUT_FUENTE:-archivo} | $(nproc) vCPU, $(awk '/MemTotal/{printf "%.1f", $2/1048576}' /proc/meminfo) GB" | tee -a $LOG
+latido & LATIDO_PID=$!; trap 'kill $LATIDO_PID 2>/dev/null' EXIT
+echo "== solver: highs ${SOLVER_OPCIONES:-highs-hipo} ($(PX python -c 'from importlib.metadata import version as v;print("highspy",v("highspy"))' 2>/dev/null || echo 'highspy ?'))"
 HECHOS=()
 for Y in $ANIOS; do
   CFG=$E/config_$Y.yaml; SOL=results/$RUN/networks/solved_$Y.nc
@@ -57,7 +71,16 @@ for Y in $ANIOS; do
   EXTRA=""; [[ -f $E/ccl_$Y.yaml ]] && EXTRA="$E/ccl_$Y.yaml"
   estado calculando "año $Y: resolviendo"
   if ! PX snakemake --cores ${SNAKE_CORES:-all} $SOL --configfile $CFG $EXTRA --rerun-triggers mtime >>$LOG 2>&1; then
-    echo "$Y: falló la optimización (ver logs/run.log)" >> $E/avisos.txt; continue
+    # Si falla con HiPO, se reintenta una vez con el punto interior clásico (IPX, highs-default).
+    if [[ "${SOLVER_OPCIONES:-highs-hipo}" != "highs-default" ]]; then
+      echo "$Y: falló con ${SOLVER_OPCIONES:-highs-hipo}; reintento con highs-default" | tee -a $E/avisos.txt
+      estado calculando "año $Y: resolviendo (reintento IPX)"
+      SOLVER_OPCIONES=highs-default PX python railway/edge_paquete.py config $E/paquete.json $Y $CFG >>$LOG 2>&1
+      PX snakemake --cores ${SNAKE_CORES:-all} $SOL --configfile $CFG $EXTRA --rerun-triggers mtime >>$LOG 2>&1 \
+        || { echo "$Y: falló la optimización (ver logs/run.log)" | tee -a $E/avisos.txt; grep -iE "error|exception|infeasible" $LOG | tail -n 20; continue; }
+    else
+      echo "$Y: falló la optimización (ver logs/run.log)" | tee -a $E/avisos.txt; grep -iE "error|exception|infeasible" $LOG | tail -n 20; continue
+    fi
   fi
   PX python railway/edge_export.py $SOL $E/paquete.json $Y $E $E/ajustes_$Y.json >>$LOG 2>&1 \
     && HECHOS+=($Y) || echo "$Y: exportación" >> $E/avisos.txt

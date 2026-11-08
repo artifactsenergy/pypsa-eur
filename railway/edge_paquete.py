@@ -62,7 +62,8 @@ def configuracion(p, anio):
                   "emission_prices": {"enable": True, "co2": float(a["co2_eur_t"])}},
         # Corte de carga a 100.000 €/MWh (valor por defecto de PyPSA-Eur): evita que un desajuste entre la demanda
         # del escenario y el parque deje el problema infactible; la energía no suministrada sale en los resultados.
-        "solving": {"solver": {"name": "highs", "options": "highs-default"},
+        # HiPO (punto interior paralelo de HiGHS, highspy-extras) por defecto; SOLVER_OPCIONES=highs-default vuelve a IPX.
+        "solving": {"solver": {"name": "highs", "options": os.environ.get("SOLVER_OPCIONES", "highs-hipo")},
                     "options": {"load_shedding": {"enable": True}}},
         # La demanda sintética de PyPSA-Eur no cubre los años recientes (2025 falla al recortarla a los snapshots);
         # se usa la demanda real de ENTSO-E/OPSD/NESO con relleno de huecos. edge_ajustes.py la escala después a

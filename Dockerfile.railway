@@ -10,6 +10,11 @@ WORKDIR /app
 # 1) Entorno (capa cacheable): solo pixi.toml / pixi.lock
 COPY pixi.toml pixi.lock ./
 RUN pixi install -e default && pixi clean cache --yes
+# HiPO (punto interior paralelo de HiGHS): highspy >= 1.15.1 + highspy-extras (Apache 2.0). Se instala con pip
+# encima del entorno pixi y se comprueba en la construcción que HiPO está disponible.
+RUN pixi run -e default python -m ensurepip --upgrade && \
+    pixi run -e default python -m pip install --no-cache-dir "highspy>=1.15.1" "highspy-extras>=1.15.1" && \
+    pixi run -e default python -c "import highspy, highspy_extras; from importlib.metadata import version as v; print('highspy', v('highspy'), 'extras', v('highspy-extras'))"
 
 # 2) Código del workflow
 COPY . .
