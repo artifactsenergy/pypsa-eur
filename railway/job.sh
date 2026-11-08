@@ -10,6 +10,8 @@
 set -uo pipefail
 cd /app
 if [[ -z "${PAQUETE_KEY:-}" ]]; then
+  # EDGE_SOLO=1: el servicio solo corre trabajos lanzados desde EDGE (un despliegue sin paquete no calcula nada)
+  if [[ "${EDGE_SOLO:-0}" == "1" ]]; then echo "Sin PAQUETE_KEY: esperando un lanzamiento desde EDGE."; exit 0; fi
   exec bash -lc "pixi run -e default snakemake --cores ${SNAKE_CORES:-all} ${SNAKE_TARGET} --configfile ${SNAKE_CONFIG} --rerun-incomplete ${SNAKE_EXTRA:-}"
 fi
 export EDGE_DIR=/app/edge
