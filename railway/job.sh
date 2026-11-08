@@ -18,7 +18,7 @@ export EDGE_DIR=/app/edge
 E=$EDGE_DIR; mkdir -p $E/logs; LOG=$E/logs/run.log
 B(){ python3 railway/edge_bucket.py "$@"; }
 estado(){ B estado "$@" || true; }
-falla(){ estado error "$1" "$(tail -c 1500 $LOG 2>/dev/null)"; B resumen $E >/dev/null 2>&1; B subir $E || true; exit 1; }
+falla(){ echo "== FALLO: $1"; cat $E/avisos.txt 2>/dev/null; tail -n 120 $LOG 2>/dev/null; estado error "$1" "$(tail -c 1500 $LOG 2>/dev/null)"; B resumen $E >/dev/null 2>&1; B subir $E || true; exit 1; }
 PX(){ pixi run -e default "$@"; }
 
 # Clave de Copernicus CDS (solo para CUTOUT_FUENTE=construir): CDSAPI_URL y CDSAPI_KEY -> ~/.cdsapirc
@@ -40,7 +40,7 @@ for Y in $ANIOS; do
   PX python railway/edge_paquete.py config $E/paquete.json $Y $CFG >>$LOG 2>&1 || { echo "$Y: configuración" >> $E/avisos.txt; continue; }
   estado calculando "año $Y: red y datos"
   if ! PX snakemake --cores ${SNAKE_CORES:-all} $SOL --configfile $CFG --until compose_network --rerun-incomplete >>$LOG 2>&1; then
-    echo "$Y: falló la preparación de la red (ver logs/run.log)" >> $E/avisos.txt; continue
+    echo "$Y: falló la preparación de la red (ver logs/run.log)" | tee -a $E/avisos.txt; grep -iE "error|exception|missing|not found" $LOG | tail -n 40; continue
   fi
   RED=$(ls -t resources/$RUN/networks/composed_$Y.nc resources/networks/composed_$Y.nc 2>/dev/null | head -1)
   [[ -n "$RED" ]] || { echo "$Y: no se encontró composed_$Y.nc" >> $E/avisos.txt; continue; }
