@@ -67,6 +67,7 @@ def test_config():
     assert edge_paquete.configuracion(paquete(), 2030)["countries"] == ["ES", "PT", "FR"]
     os.environ.pop("PAISES")
     assert c["atlite"]["default_cutout"] == "europe-2025-sarah3-era5"
+    assert c["load"]["supplement_synthetic"] is False
     os.environ["CUTOUT_FUENTE"] = "construir"
     c = edge_paquete.configuracion(paquete(), 2030)
     assert c["atlite"]["default_cutout"] in c["atlite"]["cutouts"] and c["data"]["cutout"]["source"] == "build"

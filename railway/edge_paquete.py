@@ -61,6 +61,10 @@ def configuracion(p, anio):
         "costs": {"overwrites": {"fuel": {"gas": float(a["gas_eur_mwh"])}},
                   "emission_prices": {"enable": True, "co2": float(a["co2_eur_t"])}},
         "solving": {"solver": {"name": "highs", "options": "highs-default"}},
+        # La demanda sintética de PyPSA-Eur no cubre los años recientes (2025 falla al recortarla a los snapshots);
+        # se usa la demanda real de ENTSO-E/OPSD/NESO con relleno de huecos. edge_ajustes.py la escala después a
+        # la energía anual del escenario en los países con objetivo.
+        "load": {"supplement_synthetic": False},
     }
     if entrada:
         cfg["atlite"]["cutouts"] = entrada
