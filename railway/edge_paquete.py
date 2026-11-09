@@ -59,7 +59,9 @@ def configuracion(p, anio):
         "atlite": {"default_cutout": nombre, "nprocesses": int(os.environ.get("ATLITE_PROCESOS", "4"))},
         "clustering": {"temporal": {"averaging": os.environ.get("RESOLUCION", "3h")},
                        "cluster_network": {"n_clusters": int(os.environ.get("CLUSTERS", "37"))}},
-        "costs": {"overwrites": {"fuel": {"gas": float(a["gas_eur_mwh"])}},
+        # Los costes de PyPSA-Eur (technology-data) solo existen cada 5 años (2025, 2030...): año de costes = el
+        # quinquenio anterior (2026 -> 2025). El gas y el CO2 vienen del paquete, así que solo afecta a CAPEX/FOM.
+        "costs": {"year": int(anio) - int(anio) % 5, "overwrites": {"fuel": {"gas": float(a["gas_eur_mwh"])}},
                   "emission_prices": {"enable": True, "co2": float(a["co2_eur_t"])}},
         # Corte de carga a 100.000 €/MWh (valor por defecto de PyPSA-Eur): evita que un desajuste entre la demanda
         # del escenario y el parque deje el problema infactible; la energía no suministrada sale en los resultados.
