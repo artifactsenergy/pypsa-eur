@@ -6,6 +6,8 @@ Uso:
   python3 railway/edge_bucket.py estado ESTADO FASE [MENSAJE]
   python3 railway/edge_bucket.py resumen <dir_edge>        junta por_anio_*.json en resumen.json
   python3 railway/edge_bucket.py subir <dir_edge>          sube resumen.json, series/ y logs/ a RUN_PREFIX
+  python3 railway/edge_bucket.py meteo <año> <dir>         baja es_hourly_<año>.csv e instalada_<año>.json de EDGE
+                                                           (datos/opentepes/meteo/<año>/), los mismos que usan EDGE y openTEPES
 Variables: PAQUETE_KEY, RUN_PREFIX, BUCKET, ENDPOINT, ACCESS_KEY_ID, SECRET_ACCESS_KEY, REGION.
 """
 import datetime as dt
@@ -59,6 +61,11 @@ def main():
         for f in [x for x in d.rglob("*") if x.is_file() and x.name != "paquete.json"]:
             cli.upload_file(str(f), os.environ["BUCKET"], os.environ["RUN_PREFIX"] + f.relative_to(d).as_posix()); n += 1
         print(n, "ficheros subidos")
+    elif orden == "meteo":
+        anio, d = sys.argv[2], Path(sys.argv[3]); d.mkdir(parents=True, exist_ok=True); cli = s3()
+        for f in ("es_hourly_%s.csv" % anio, "instalada_%s.json" % anio):
+            cli.download_file(os.environ["BUCKET"], "datos/opentepes/meteo/%s/%s" % (anio, f), str(d / f))
+        print("meteo", anio, "->", d)
     else:
         raise SystemExit(__doc__)
 

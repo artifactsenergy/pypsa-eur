@@ -14,7 +14,12 @@ Reglas, por país con objetivo (España del TOML de EDGE; el resto del plan [eur
   - battery: potencia de descarga fija repartida por la carga de cada nudo y energía = potencia × horas
     (almacenamiento.baterias_horas del TOML; 4 h si no hay dato); la carga la ajusta la restricción de PyPSA-Eur.
   - solar_term, cogeneración y electrolizadores de España: sin equivalente directo; quedan en avisos.
+  - Perfiles de España (si hay <dir_salida>/meteo/): los p_max_pu de onwind y solar de España se escalan para que
+    cada generador tenga el factor de capacidad anual real del año meteorológico (T.Real peninsular / potencia
+    instalada media, los mismos datos que usan EDGE y openTEPES). Se conserva la forma horaria y espacial de atlite.
+    Desactivable con CALIBRAR_PERFILES=0.
 """
+import os
 import json
 import sys
 from pathlib import Path
@@ -132,12 +137,47 @@ def ajustar(n, obj, anio):
     return informe, ccl
 
 
+def calibrar_perfiles_es(n, dir_meteo, anio_meteo):
+    """Escala p_max_pu de onwind y solar de España al factor de capacidad real del año meteorológico."""
+    h = pd.read_csv(dir_meteo / ("es_hourly_%d.csv" % anio_meteo))
+    ins = json.load(open(dir_meteo / ("instalada_%d.json" % anio_meteo)))["peninsular"]
+    objetivo = {"onwind": h["eolica"].clip(lower=0).sum() / (len(h) * float(ins["eolica"])),
+                "solar": h["solar_fv"].clip(lower=0).sum() / (len(h) * float(ins["solar_fv"]))}
+    w = n.snapshot_weightings.generators
+    out = {}
+    for tec, cf_obj in objetivo.items():
+        gens = n.generators.index[(n.generators.bus.map(n.buses.country) == "ES") & n.generators.carrier.isin(GRUPOS[tec])]
+        gens = [g for g in gens if g in n.generators_t.p_max_pu.columns]
+        if not gens:
+            continue
+        pm = n.generators_t.p_max_pu[gens]
+        cf0 = (pm.mul(w, axis=0).sum() / w.sum())
+        cap = n.generators.loc[gens, "p_nom"].where(n.generators.loc[gens, "p_nom"] > 0, n.generators.loc[gens, "p_nom_max"].clip(upper=1e5))
+        antes = float((cf0 * cap).sum() / cap.sum()) if cap.sum() > 0 else float(cf0.mean())
+        nuevo = pm.copy()
+        for g in gens:                      # factor por generador, iterando por el recorte en 1
+            k = cf_obj / max(cf0[g], 1e-6)
+            for _ in range(8):
+                x = (pm[g] * k).clip(upper=1.0); cf = float((x * w).sum() / w.sum())
+                if cf <= 0 or abs(cf - cf_obj) < 1e-4:
+                    break
+                k *= cf_obj / cf
+            nuevo[g] = (pm[g] * k).clip(upper=1.0)
+        n.generators_t.p_max_pu[gens] = nuevo
+        out[tec] = {"cf_atlite": round(antes, 4), "cf_objetivo": round(float(cf_obj), 4), "generadores": len(gens)}
+        print("perfil ES", tec, "FC atlite %.3f -> real %d %.3f" % (antes, anio_meteo, cf_obj))
+    return out
+
+
 def main():
     red, ruta_p, anio, salida = sys.argv[1], sys.argv[2], int(sys.argv[3]), Path(sys.argv[4])
     salida.mkdir(parents=True, exist_ok=True)
     p = json.load(open(ruta_p, encoding="utf-8"))
     n = pypsa.Network(red)
     informe, ccl = ajustar(n, objetivos(p, anio), anio)
+    dir_meteo = salida / "meteo"
+    if os.environ.get("CALIBRAR_PERFILES", "1") == "1" and dir_meteo.exists():
+        informe.setdefault("ES", {"avisos": []})["perfiles"] = calibrar_perfiles_es(n, dir_meteo, int(p["anio_meteorologico"]))
     n.export_to_netcdf(red)
     if ccl:
         idx = pd.MultiIndex.from_tuples([(c, k) for c, k, _ in ccl], names=["country", "carrier"])

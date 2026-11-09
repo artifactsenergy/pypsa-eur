@@ -65,6 +65,10 @@ RUN=$(python3 -c "import json;print('edge-'+json.load(open('$E/paquete.json')).g
 echo "== $RUN_ID | años: $ANIOS | nudos ${CLUSTERS:-37} | ${RESOLUCION:-3h} | cutout ${CUTOUT_FUENTE:-archivo} | $(nproc) vCPU, $(awk '/MemTotal/{printf "%.1f", $2/1048576}' /proc/meminfo) GB" | tee -a $LOG
 latido & LATIDO_PID=$!; trap 'kill $LATIDO_PID 2>/dev/null' EXIT
 echo "== solver: highs ${SOLVER_OPCIONES:-highs-hipo} ($(PX python -c 'from importlib.metadata import version as v;print("highspy",v("highspy"),"extras",v("highspy-extras"))' 2>/dev/null || echo 'highspy ?'))"
+MET=$(python3 -c "import json;print(json.load(open('$E/paquete.json'))['anio_meteorologico'])")
+# Perfiles reales de España del año meteorológico (los de EDGE/openTEPES) para calibrar onwind y solar
+B meteo $MET $E/meteo >>$LOG 2>&1 && echo "== perfiles ES $MET: calibración de onwind y solar al FC real" \
+  || echo "== sin perfiles ES de $MET en el bucket: onwind y solar sin calibrar" | tee -a $E/avisos.txt
 HECHOS=()
 for Y in $ANIOS; do
   CFG=$E/config_$Y.yaml; SOL=results/$RUN/networks/solved_$Y.nc
