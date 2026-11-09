@@ -310,7 +310,8 @@ def distribute_n_clusters_to_countries(
         )
         solver_name = "scip"
     m.solve(solver_name=solver_name)
-    return m.solution["n"].to_series().astype(int)
+    # edge: redondear antes de convertir; astype(int) trunca 0.9999999 a 0 y KMeans falla con n_clusters=0
+    return m.solution["n"].to_series().round().astype(int).clip(lower=1)
 
 
 def busmap_for_n_clusters(
